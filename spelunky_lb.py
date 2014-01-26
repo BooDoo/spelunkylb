@@ -13,7 +13,9 @@ avatars = [
     "Helsing", "Warrior", "MeatBoy", "Yang", "Eskimo", "RoundB", "Ninja",
     "RoundG", "Cyclops", "Viking", "Robot", "Monk"
 ]
-
+_index_url = 'http://steamcommunity.com/stats/239350/leaderboards/?xml=1'
+_tree = None
+_leaderboards = None
 
 def read_details(details):
     avatar = int(details[0:2], 16)
@@ -45,6 +47,22 @@ def coerce_date(date):
         year = int(date[4:8])
         return datetime.date(year, month, day)
 
+def leaderboards(infile=None, persist=True, force=False):
+    global _tree
+    global _leaderboards
+    global _index_url
+    if _tree is None or force:
+        if infile:
+            _tree = etree.parse(infile)
+        else:
+            infile = os.path.join('data', 'leaderboards.xml')
+            r = requests.get(_index_url)
+            _tree = etree.fromstring(r.content)
+        if persist:
+            with open(infile, 'w') as outfile:
+                outfile.write(etree.tostring(_tree))
+    _leaderboards = (Leaderboard(lb) for lb in _tree.iter('leaderboard'))
+    return _leaderboards
 
 class Leaderboard(object):
     def __init__(self, lb=None, lbid=None, name=None,

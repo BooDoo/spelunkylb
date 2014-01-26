@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 
-import xml.etree.ElementTree as etree
-from spelunky_lb import avatars, Leaderboard
-from spelunky_lb import LbRow as Row
+import spelunky_lb
 
-lbs = etree.parse('leaderboards.xml').getroot().iter('leaderboard')
-prerelease = (Leaderboard(lb) for lb in lbs if int(lb[4].text) > 0 
-              and int(lb[4].text) < 25 and lb[2].text.endswith("DAILY"))
-output = open('prerelease.txt', 'w')
+
+lbs = spelunky_lb.leaderboards()
+prerelease = (lb for lb in lbs if lb.entries > 0 
+              and lb.entries < 25 and lb.name.endswith("DAILY"))
+output = open('output/prerelease.txt', 'w')
 
 for lb in prerelease:
     #print "Persisting data..."
