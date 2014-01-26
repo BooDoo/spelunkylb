@@ -56,15 +56,19 @@ class Leaderboard(object):
             self.entries = int(self.entries)
         else:
             self.lbid = str(lbid)
-            self.name = name
+            self.name = str(name)
             self.entries = int(entries)
             self.url = ('http://steamcommunity.com/stats/23950/leaderboards/'
                         + lbid + "/?xml=1")
 
         if infile is None:
+            self._file = os.path.join('data', self.lbid + '.xml')
             self._tree = None
+            self._persisted = False
         else:
-            self._tree = etree.parse(xml).getroot()
+            self._file = infile
+            self._tree = etree.parse(infile)
+            self._persisted = True
         self._rows = None
         self._data = None
 
@@ -84,6 +88,8 @@ class Leaderboard(object):
 
     @property
     def date(self):
+        if self._date is None:
+            return self._date
         return self._date.strftime('%m/%d/%Y')
 
     @property
@@ -97,8 +103,11 @@ class Leaderboard(object):
     #TODO: Get 5001+ (self.next_url)
     def tree(self):
         if self._tree is None:
-            r = requests.get(self.url)
-            self._tree = etree.fromstring(r.content)
+            if os.path.exists(self._file):
+                self._tree = etree.parse(self._file)
+            else:
+                r = requests.get(self.url)
+                self._tree = etree.fromstring(r.content)
         return self._tree
 
     @property
@@ -114,11 +123,14 @@ class Leaderboard(object):
             })
         return self._data
 
-    def persist(self,outpath=None):
-        outpath = outpath or self.lbid + '.xml'
-        with open(outpath, 'w') as outfile:
-            outfile.write(etree.tostring(self.tree))
-        return outpath
+    def persist(self, outpath=None, force=False):
+        outpath = outpath or self._file
+        if force or not os.path.exists(outpath):
+            tree = self.tree
+            with open(outpath, 'w') as outfile:
+                outfile.write(etree.tostring(tree))
+            self._persisted = True
+        return self._persisted
         
 
 class LbRow(object):
@@ -148,7 +160,6 @@ class LbRow(object):
             world = stage/4+1
             level = stage % 4
         return "%i-%i" % (world, level)
-
 
     @property
     def stage(self):
