@@ -16,6 +16,9 @@ avatars = [
 _index_url = 'http://steamcommunity.com/stats/239350/leaderboards/?xml=1'
 _tree = None
 _leaderboards = None
+_all_time_url = 'http://steamcommunity.com/stats/239350/leaderboards/166704/?xml=1'
+_all_time = None
+_release = datetime.date(2013,8,8)
 
 def read_details(details):
     avatar = int(details[0:2], 16)
@@ -56,18 +59,58 @@ def leaderboards(infile=None, persist=True, force=False):
             _tree = etree.parse(infile)
         else:
             infile = os.path.join('data', 'leaderboards.xml')
-            r = requests.get(_index_url)
-            _tree = etree.fromstring(r.content)
+            try:
+                r = requests.get(_index_url)
+                _tree = etree.fromstring(r.content)
+            except requests.exceptions.ConnectionError as e:
+                print e.message
+                print "Trying to read from local cache..."
+                try:
+                    _tree = etree.parse(infile)
+                    persist = False
+                except StandardError as er:
+                    raise er
         if persist:
             with open(infile, 'w') as outfile:
                 outfile.write(etree.tostring(_tree))
     _leaderboards = (Leaderboard(lb) for lb in _tree.iter('leaderboard'))
     return _leaderboards
 
+#Look at this, look at leaderboards() above. Obviously can be abstracted!
+def all_time(infile=None, persist=True, force=True):
+    global _all_time
+    if _all_time is None or force:
+        if infile:
+            tree = etree.parse(infile)
+        else:
+            infile = os.path.join('data', 'alltime.xml')
+            r = requests.get(_all_time_url)
+            tree = etree.fromstring(r.content)
+        if persist:
+            with open(infile, 'w') as outfile:
+                outfile.write(etree.tostring(tree))
+
+    return Leaderboard(tree)
+
+def dailies(infile=None, persist=True, force=False, sort=True,
+            since=None, until=None):
+    '''
+    Returns list of Daily Challenge Leaderboard objects,
+    optionally limited/sorted by date.
+    '''
+    since = since or _release
+    until = until or datetime.date.today()
+    dailies = (lb for lb in leaderboards(infile, persist, force)
+               if lb._date and lb._date >= since and lb._date <= until)
+    if sort:
+        return sorted(dailies)
+    else:
+        return list(dailies)
+
+
 class Leaderboard(object):
     def __init__(self, lb=None, lbid=None, name=None,
                  date=None, infile=None, entries=0):
-        #pass
         if lb is not None:
             (self.url, self.lbid, self.name, _ign,
              self.entries, _ign, _ign) = (f.text for f in lb)
@@ -76,21 +119,20 @@ class Leaderboard(object):
             self.lbid = str(lbid)
             self.name = str(name)
             self.entries = int(entries)
-            self.url = ('http://steamcommunity.com/stats/23950/leaderboards/'
-                        + lbid + "/?xml=1")
+            self.url = ('http://steamcommunity.com/stats/23950/leaderboards/%s/?xml=1' % lbid)
 
         if infile is None:
             self._file = os.path.join('data', self.lbid + '.xml')
-            self._tree = None
             self._persisted = False
         else:
             self._file = infile
-            self._tree = etree.parse(infile)
+            #self._tree = etree.parse(infile)
             self._persisted = True
+        self._tree = None
         self._rows = None
         self._data = None
 
-        if self.entries > 5001:
+        if self.entries > 5000:
             self.next_url = self.url + "&start=5002"
         else:
             self.next_url = None
@@ -102,7 +144,19 @@ class Leaderboard(object):
             self._date = None
 
     def __iter__(self):
-        return iter(self.rows)
+        return self.rows
+
+    def __lt__(self, other):
+        return self._date < other._date
+
+    def __enter__(self):
+        #print "Working with %s - %s" % (self.lbid, self.date)
+        return self
+
+    def __exit__(self, e, err, trace):
+        del self._tree
+        del self._rows
+        del self._data
 
     @property
     def date(self):
@@ -113,8 +167,8 @@ class Leaderboard(object):
     @property
     def rows(self):
         if self._rows is None:
-            self._rows = [LbRow(e, date=self.date)
-                          for e in self.tree.iter('entry')]
+            self._rows = (LbRow(e, date=self.date)
+                          for e in self.tree.iter('entry'))
         return self._rows
 
     @property
@@ -149,7 +203,7 @@ class Leaderboard(object):
                 outfile.write(etree.tostring(tree))
             self._persisted = True
         return self._persisted
-        
+
 
 class LbRow(object):
     def __init__(self, entry=None, date=None, **kwargs):
@@ -168,7 +222,6 @@ class LbRow(object):
     def __repr__(self):
         return "%s\t%s\t%s\t%s\t%s" % (self.rank, self.score, self.avatar,
                                        self.stage, self.steamid)
-
     def pretty_stage(self):
         stage = self._stage
         if stage % 4 == 0:
@@ -182,7 +235,7 @@ class LbRow(object):
     @property
     def stage(self):
         return pretty_stage(self._stage)
-        
+
     @property
     def avatar(self):
         return avatars[self._avatar]
