@@ -55,7 +55,7 @@ def leaderboards(infile=None, persist=True, force=False):
     global _leaderboards
     global _index_url
     if _tree is None or force:
-        if infile:
+        if infile and not force:
             _tree = etree.parse(infile)
         else:
             infile = os.path.join('data', 'leaderboards.xml')
@@ -73,7 +73,7 @@ def leaderboards(infile=None, persist=True, force=False):
         if persist:
             with open(infile, 'w') as outfile:
                 outfile.write(etree.tostring(_tree))
-    _leaderboards = (Leaderboard(lb) for lb in _tree.iter('leaderboard'))
+    _leaderboards = (Leaderboard(lb, force=force) for lb in _tree.iter('leaderboard'))
     return _leaderboards
 
 #Look at this, look at leaderboards() above. Obviously can be abstracted!
@@ -90,7 +90,7 @@ def all_time(infile=None, persist=True, force=True):
             with open(infile, 'w') as outfile:
                 outfile.write(etree.tostring(tree))
 
-    return Leaderboard(tree)
+    return Leaderboard(tree, force=force)
 
 def dailies(infile=None, persist=True, force=False, sort=True,
             since=None, until=None):
@@ -109,7 +109,7 @@ def dailies(infile=None, persist=True, force=False, sort=True,
 
 
 class Leaderboard(object):
-    def __init__(self, lb=None, lbid=None, name=None,
+    def __init__(self, lb=None, lbid=None, name=None, force=False,
                  date=None, infile=None, entries=0):
         if lb is not None:
             (self.url, self.lbid, self.name, _ign,
@@ -126,11 +126,11 @@ class Leaderboard(object):
             self._persisted = False
         else:
             self._file = infile
-            #self._tree = etree.parse(infile)
             self._persisted = True
         self._tree = None
         self._rows = None
         self._data = None
+        self._force = force
 
         if self.entries > 5000:
             self.next_url = self.url + "&start=5002"
@@ -154,9 +154,9 @@ class Leaderboard(object):
         return self
 
     def __exit__(self, e, err, trace):
-        del self._tree
-        del self._rows
-        del self._data
+        self._tree = None
+        self._rows = None
+        self._data = None
 
     @property
     def date(self):
@@ -175,7 +175,7 @@ class Leaderboard(object):
     #TODO: Get 5001+ (self.next_url)
     def tree(self):
         if self._tree is None:
-            if os.path.exists(self._file):
+            if os.path.exists(self._file) and not self._force:
                 self._tree = etree.parse(self._file)
             else:
                 r = requests.get(self.url)

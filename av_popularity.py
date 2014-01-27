@@ -1,36 +1,30 @@
 # -*- coding: utf-8 -*-
 import os
-import sys
 import spelunky_lb
 from datetime import date
 from spelunky_lb import avatars
-from itertools import chain
 
-# - Only reads ranks 1-5000 of each daily
 # - Requires ~60MB memory
-# TIMING:
-#   Downloading/tallying all Dailies via requests:
+# ALL DAILIES FROM RELEASE TO DATE:
+#   Fetching via requests:
 #   - Takes ~8 minutes on my Chromebook
-#   Tallying locally cached XML for all Dailies:
+#   Locally cached XML:
 #   - Takes ~5 minutes on my Chromebook
-#   Tallying one month (November 2013) locally cached XML:
+# ONE MONTH (November, 2013):
+#   Fetching via requests:
+#   - Takes ~2 minutes on my Chromebook
+#   Locally cached XML:
 #   - Takes ~50 seconds on my Chromebook
+# TODO:
+# - Append entries past 5000 into tree before working with rows (prototype in get_pages.py)
 
 since = date(2013, 11, 1)
 until = date(2013, 11, 30)
-since = None
-until = None
+# since = None
+# until = None
 
 av_tally = {a: 0 for a in avatars}
-dailies = spelunky_lb.dailies(since=since, until=until)
-
-for d in dailies:
-    with d as lb:
-        for r in lb:
-            av_tally[r.avatar] += 1
-        print "done with %s" % lb.date
-        
-av_tally = {a: 0 for a in avatars}
+dailies = spelunky_lb.dailies(since=since, until=until, force=True)
 
 for d in dailies:
     with d as lb:
