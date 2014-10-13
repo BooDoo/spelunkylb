@@ -1,3 +1,5 @@
+#!/usr/bin/env python2
+
 import spelunky_lb
 import datetime
 # As of Jan 26, 2014:
@@ -17,13 +19,17 @@ import datetime
 # TODO:
 # - Append entries past 5000 into tree before working with rows (prototype in get_pages.py)
 
-## Prerelease-only dates (for smaller tables/dataset)
-since = datetime.date(2013, 5, 30)
-until = datetime.date(2013, 8, 7)
-
 ## All dailies
-# since = None
+# since = None # Defaults to release date
 # until = datetime.date.today()
+
+## Prerelease-only dates (for smaller tables/dataset)
+# since = datetime.date(2013, 5, 30)
+# until = datetime.date(2013, 8, 7)
+
+## Test uncached:
+since = datetime.date(2014, 5, 31)
+until = datetime.date.today()
 
 dailies = spelunky_lb.dailies(sort=True, persist=True, since=since, until=until)
 
