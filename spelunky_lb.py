@@ -113,16 +113,17 @@ def dailies(infile=None, persist=True, force=False, sort=True,
 
 class Leaderboard(object):
     def __init__(self, lb=None, lbid=None, name=None, force=False,
-                 date=None, infile=None, entries=0):
+                 date=None, infile=None, entries=0, page_size=5000):
+        self._page_size = min(page_size, 5000)
         if lb is not None:
             (self.url, self.lbid, self.name, _ign,
-             self.entries, _ign, _ign) = (f.text for f in lb)
+            self.entries, _ign, _ign, _ign, _ign) = (f.text for f in lb)
             self.entries = int(self.entries)
         else:
             self.lbid = str(lbid)
             self.name = str(name)
             self.entries = int(entries)
-            self.url = ('http://steamcommunity.com/stats/23950/leaderboards/%s/?xml=1' % lbid)
+            self.url = ('http://steamcommunity.com/stats/239350/leaderboards/%s/?xml=1' % self.lbid)
 
         if infile is None:
             self._file = os.path.join('data', self.lbid + '.xml')
@@ -135,11 +136,13 @@ class Leaderboard(object):
         self._data = None
         self._force = force
 
-        if self.entries > 5000:
-            self.next_url = self.url + "&start=5002"
-        else:
-            self.next_url = None
-
+        self._max_page = self.entries / page_size + 1
+        self._next_page = 0
+        self.urls = [
+            'http://steamcommunity.com/stats/239350/leaderboards/' +
+            '%s/?xml=1&start=%i&end=%i' % (self.lbid, n*page_size+n, (n+1)*page_size+1)
+            for n in range(self._max_page+1)
+        ]
         if self.name.endswith('DAILY'):
             m, d, y = [int(n) for n in self.name.split(' ')[0].split('/')]
             self._date = datetime.date(y, m, d)
@@ -153,7 +156,7 @@ class Leaderboard(object):
         return self._date < other._date
 
     def __enter__(self):
-        #print "Working with %s - %s" % (self.lbid, self.date)
+        #print("Working with %s - %s" % (self.lbid, self.date))
         return self
 
     def __exit__(self, e, err, trace):
@@ -175,15 +178,42 @@ class Leaderboard(object):
         return self._rows
 
     @property
-    #TODO: Get 5001+ (self.next_url)
+    #Fills tree with first self._page_size records.
     def tree(self):
         if self._tree is None:
             if os.path.exists(self._file) and not self._force:
                 self._tree = etree.parse(self._file)
             else:
-                r = requests.get(self.url)
+                if self._next_page > self._max_page:
+                    raise IndexError("No more pages to retrieve!")
+                r = requests.get(self.urls[self._next_page])
+                # to read latest retrieval after crash:
+                with open('debug.xml', 'w') as debug_out:
+                    debug_out.write(r.content)
                 self._tree = etree.fromstring(r.content)
+                self._next_page += 1
         return self._tree
+
+    def append_page(self):
+        if self._next_page > self._max_page:
+            raise IndexError("No more pages to retrieve!")
+        if self._tree is None:
+            return self.tree
+        r = requests.get(self.urls[self._next_page])
+        self._tree.extend(etree.fromstring(r.content).findall('entries/entry'))
+        self._next_page += 1
+        return self._tree
+
+    def next_page(self):
+        self._tree = None
+        return self.tree
+
+    def prev_page(self):
+        if self._next_page - 2 < 0:
+            raise IndexError("Can't get page < 0")
+        self._next_page -= 2
+        self._tree = None
+        return self.tree
 
     @property
     def data(self):
