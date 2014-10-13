@@ -1,10 +1,10 @@
 import xml.etree.ElementTree as etree
 import requests
 import os
-import sys
+from sys import maxint as MAXINT
 
-def get_pages(url, page=0, label=None, persist=True, infile=None,
-              force=False, max_page=sys.maxint):
+def get_pages(self, page=0, label=None, persist=True, infile=None,
+              force=False, max_page=MAXINT):
     trees = []
     while True:
         tree = get_page(url, page, label, persist, infile, force)

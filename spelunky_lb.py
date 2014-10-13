@@ -1,4 +1,7 @@
+#!/usr/bin/env python2
+
 import os
+from sys import maxint as MAXINT
 import re
 import datetime
 import requests
@@ -63,8 +66,8 @@ def leaderboards(infile=None, persist=True, force=False):
                 r = requests.get(_index_url)
                 _tree = etree.fromstring(r.content)
             except requests.exceptions.ConnectionError as e:
-                print e.message
-                print "Trying to read from local cache..."
+                print(e.message)
+                print("Trying to read from local cache...")
                 try:
                     _tree = etree.parse(infile)
                     persist = False
