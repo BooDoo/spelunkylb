@@ -28,7 +28,7 @@ import datetime
 # until = datetime.date(2013, 8, 7)
 
 ## Test uncached:
-since = datetime.date(2014, 5, 31)
+since = datetime.date(2014, 10, 12)
 until = datetime.date.today()
 
 dailies = spelunky_lb.dailies(sort=True, persist=True, since=since, until=until)
@@ -36,12 +36,10 @@ dailies = spelunky_lb.dailies(sort=True, persist=True, since=since, until=until)
 output = open('output/dailies.txt', 'w')
 for d in dailies:
     with d as lb:
+        lb.persist();
         print lb.date
         output.write(str(lb.date)+"\n"+("-"*10)+"\n")
-        #print "-"*10
         for row in lb:
-            #print row
             output.write(str(row)+"\n")
-        #print "-"*50,"\n"
         output.write(("-"*50)+"\n\n")
 output.close()
